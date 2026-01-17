@@ -1,19 +1,31 @@
-# 파이썬 3.10 버전 기반 (버전은 형님 로컬이랑 맞추세요)
+# 1. 파이썬 3.10 기반 이미지
 FROM python:3.10-slim
 
-# 시간대를 서울로 설정 (주식 봇에 필수!)
+# 2. 필수 패키지 설치 (wget, unzip, gnupg 등)
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    curl \
+    gnupg \
+    --no-install-recommends
+
+# 3. 구글 크롬 브라우저 직접 다운로드 및 설치 (이 방식이 apt-key 에러를 피함)
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && apt-get install -y ./google-chrome-stable_current_amd64.deb \
+    && rm google-chrome-stable_current_amd64.deb \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. 시간대 설정 (KST)
 ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 작업 폴더 생성
+# 5. 작업 폴더 설정 및 패키지 설치
 WORKDIR /app
-
-# 라이브러리 설치
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 소스코드 복사
+# 6. 소스코드 복사
 COPY . .
 
-# 실행 명령어는 docker-compose에서 정할 거라 여기선 비워둠
-CMD ["bash"]
+# 7. 실행
+CMD ["python", "bot_runner.py"]

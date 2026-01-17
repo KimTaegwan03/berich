@@ -6,4 +6,4 @@ pandas
 requests
 asyncio
 selenium
-webdriver
+webdriver-manager

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bot Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 18px; }
+    .muted { color: #666; font-size: 12px; }
+    .topbar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+    .card { border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px; background: #fff; }
+    h2 { margin: 0 0 6px 0; }
+    h3 { margin: 0 0 10px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 13px; }
+    th { background: #fafafa; position: sticky; top: 0; }
+    .nowrap { white-space: nowrap; }
+    .right { text-align: right; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #f0f0f0; font-size: 12px; }
+    .empty { padding: 10px; color: #666; font-size: 13px; }
+    .footer { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; }
+    .btn {
+      appearance: none; border: 1px solid #ddd; background: #fff;
+      padding: 8px 12px; border-radius: 8px; cursor: pointer;
+      font-size: 13px;
+    }
+    .btn:hover { background: #fafafa; }
+    .err { color: #b00020; font-size: 13px; }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div>
+      <h2>📊 Bot Dashboard</h2>
+      <div class="muted">
+        Last update:
+        <span class="badge">
+          {{ state.updated_at if state and state.updated_at else "N/A (bot_state.json 없음/읽기 실패)" }}
+        </span>
+      </div>
+    </div>
+
+    <div class="nowrap">
+      <button class="btn" onclick="location.reload()">새로고침</button>
+    </div>
+  </div>
+
+  {% if not state %}
+    <div class="err" style="margin-top:12px;">
+      bot_state.json을 읽지 못했습니다. 봇 프로세스가 실행 중인지 확인하세요.
+    </div>
+  {% endif %}
+
+  <div class="grid">
+    <!-- 보유 -->
+    <div class="card">
+      <h3>
+        보유중 (ACC_STOCK)
+        <span class="badge">
+          {% if state and state.acc_stock %}{{ state.acc_stock | length }}{% else %}0{% endif %}
+        </span>
+      </h3>
+
+      {% if state and state.acc_stock and (state.acc_stock | length) > 0 %}
+        <div style="max-height: 60vh; overflow: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th class="nowrap">Ticker</th>
+                <th class="right nowrap">Qty</th>
+                <th class="right nowrap">Avg Price</th>
+                <th class="nowrap">Exchg</th>
+                <th class="right nowrap">Stage</th>
+                <th class="right nowrap">Max Profit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ticker, info in state.acc_stock.items() %}
+                <tr>
+                  <td class="nowrap"><b>{{ ticker }}</b></td>
+                  <td class="right nowrap">{{ info.qty if info and info.qty is not none else "" }}</td>
+                  <td class="right nowrap">
+                    {% if info and info.avg_pric is not none %}
+                      {{ "%.2f"|format(info.avg_pric) }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td class="nowrap">{{ info.excg if info and info.excg is not none else "" }}</td>
+                  <td class="right nowrap">{{ info.stage if info and info.stage is not none else 0 }}</td>
+                  <td class="right nowrap">
+                    {% if info and info.max_profit is not none %}
+                      {{ "%.2f"|format(info.max_profit) }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty">현재 보유 종목이 없습니다.</div>
+      {% endif %}
+    </div>
+
+    <!-- 미체결 -->
+    <div class="card">
+      <h3>
+        미체결 (PENDING_ORDERS)
+        <span class="badge">
+          {% if state and state.pending_orders %}{{ state.pending_orders | length }}{% else %}0{% endif %}
+        </span>
+      </h3>
+
+      {% if state and state.pending_orders and (state.pending_orders | length) > 0 %}
+        <div style="max-height: 60vh; overflow: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th class="nowrap">Ticker</th>
+                <th class="right nowrap">Qty</th>
+                <th class="right nowrap">Order Price</th>
+                <th class="nowrap">Order No</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ticker, info in state.pending_orders.items() %}
+                <tr>
+                  <td class="nowrap"><b>{{ ticker }}</b></td>
+                  <td class="right nowrap">{{ info.qty if info and info.qty is not none else "" }}</td>
+                  <td class="right nowrap">
+                    {% if info and info.order_price is not none %}
+                      {{ "%.2f"|format(info.order_price) }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td class="nowrap">{{ info.order_no if info and info.order_no is not none else "" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty">현재 미체결 주문이 없습니다.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="muted">
+      * 이 화면은 서버 렌더링(Jinja) 방식이라 새로고침 시 최신 상태가 반영됩니다.
+    </div>
+    <div class="muted">
+      경로: bot_state.json
+    </div>
+  </div>
+</body>
+</html>

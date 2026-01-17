@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  trading-bot:
+    build: .
+    container_name: my-trading-bot
+    command: python bot_runner.py  # 봇 실행
+    volumes:
+      - .:/app  # [핵심] 현재 폴더를 컨테이너랑 공유 (JSON 파일 읽기/쓰기 가능)
+    restart: always # 죽으면 되살려라
+    environment:
+      - TZ=Asia/Seoul
+
+  dashboard:
+    build: .
+    container_name: my-dashboard
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app  # [핵심] 봇이 쓴 JSON 파일을 얘도 볼 수 있음
+    ports:
+      - "8000:8000" # AWS 보안그룹 8000번 열어야 함
+    depends_on:
+      - trading-bot
+    restart: always
+    environment:
+      - TZ=Asia/Seoul

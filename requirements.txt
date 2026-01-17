@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+jinja2
+yfinance
+pandas
+requests
+asyncio
+selenium
+webdriver

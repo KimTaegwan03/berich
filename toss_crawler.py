@@ -67,10 +67,10 @@ def scrape_toss_data():
         return {"error": f"랭킹 조회 실패: {rank_resp.status_code}"}
 
     rank_data = rank_resp.json()
-    products = rank_data.get('result', {}).get('products', [])
+    products = [p for p in rank_data.get('result', {}).get('products', []) if p.get('tossSecuritiesAmount', 0) >= 100_000_000]
     product_codes = [p['productCode'] for p in products]
 
-    if not product_codes:
+    if not product_codes:                                                                                                                                                           
         return []
 
     # ---------------------------------------------------------

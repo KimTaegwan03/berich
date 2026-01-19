@@ -24,11 +24,11 @@ STATE_LOCK = asyncio.Lock()
 # ==========================================================
 # [설정] 봇 파라미터
 # ==========================================================
-CRAWL_INTERVAL_SEC = 180  # [정찰병] 크롤링 주기 (3분) -> 밴 방지!
-TRADE_INTERVAL_SEC = 15   # [스나이퍼] 매매 주기 (15초) -> 급등주 대응!
+CRAWL_INTERVAL_SEC = 120  # [정찰병] 크롤링 주기 (3분) -> 밴 방지!
+TRADE_INTERVAL_SEC = 20   # [스나이퍼] 매매 주기 (15초) -> 급등주 대응!
 
-MAX_SLOTS = 20
-BUY_PERCENT = 4.75
+MAX_SLOTS = 10
+BUY_PERCENT = 9.5
 
 GLOBAL_TARGET_TICKERS = []
 

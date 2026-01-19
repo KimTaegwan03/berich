@@ -2,6 +2,7 @@ import requests
 import json, os
 from datetime import datetime, timedelta
 import dotenv
+import pandas as pd
 
 dotenv.load_dotenv()
 
@@ -11,70 +12,110 @@ dotenv.load_dotenv()
 # 모의투자: https://openapivts.koreainvestment.com:29443
 # 실전투자: https://openapi.koreainvestment.com:9443
 KIS_BASE_URL = "https://openapivts.koreainvestment.com:29443"
+KIS_BASE_URL_REAL = "https://openapi.koreainvestment.com:9443"
 
 KIS_APP_KEY = os.environ.get("KIS_APP_KEY_MOCK")
 KIS_APP_SECRET = os.environ.get("KIS_APP_SECRET_MOCK")
 KIS_CANO = os.environ.get("KIS_CANO_MOCK")
 KIS_ACNT_PRDT_CD = os.environ.get("KIS_ACNT_PRDT_CD_MOCK")
 
+KIS_APP_KEY_REAL = os.environ.get("KIS_APP_KEY_REAL")
+KIS_APP_SECRET_REAL = os.environ.get("KIS_APP_SECRET_REAL")
+KIS_CANO_REAL = os.environ.get("KIS_CANO_REAL")
+KIS_ACNT_PRDT_CD_REAL = os.environ.get("KIS_ACNT_PRDT_CD_REAL")
+
 # 전역 변수 (토큰 캐싱용)
 ACCESS_TOKEN = None
 TOKEN_EXPIRY = None
+IS_REAL = False
 
-def get_kis_token():
+def get_kis_token(real:bool=False):
     """접근 토큰 발급/갱신 (싱글톤 패턴)"""
-    global ACCESS_TOKEN, TOKEN_EXPIRY
+    global ACCESS_TOKEN, TOKEN_EXPIRY, IS_REAL
     
-    if ACCESS_TOKEN and TOKEN_EXPIRY and datetime.now() < TOKEN_EXPIRY:
+    if IS_REAL == real and ACCESS_TOKEN and TOKEN_EXPIRY and datetime.now() < TOKEN_EXPIRY:
         return ACCESS_TOKEN
 
-    url = f"{KIS_BASE_URL}/oauth2/tokenP"
+    if real:
+        url = f"{KIS_BASE_URL_REAL}/oauth2/tokenP"
+    else:
+        url = f"{KIS_BASE_URL}/oauth2/tokenP"
+
     headers = {"content-type": "application/json"}
-    body = {
-        "grant_type": "client_credentials",
-        "appkey": KIS_APP_KEY,
-        "appsecret": KIS_APP_SECRET
-    }
+
+    if real:
+        body = {
+            "grant_type": "client_credentials",
+            "appkey": KIS_APP_KEY_REAL,
+            "appsecret": KIS_APP_SECRET_REAL
+        }
+    else:
+        body = {
+            "grant_type": "client_credentials",
+            "appkey": KIS_APP_KEY,
+            "appsecret": KIS_APP_SECRET
+        }
     
     try:
         res = requests.post(url, headers=headers, data=json.dumps(body))
         data = res.json()
         ACCESS_TOKEN = data['access_token']
         TOKEN_EXPIRY = datetime.now() + timedelta(hours=23) # 23시간 유효
+        IS_REAL = real
         print(f"🔑 [KIS] 토큰 발급 완료")
         return ACCESS_TOKEN
     except Exception as e:
         print(f"❌ [KIS] 토큰 발급 실패: {e}")
         return None
     
-def get_account_balance():
+def get_account_balance(real:bool=False):
     """
     계좌의 총 자산(USD)과 주문가능 현금(USD)을 조회
     return: (총자산, 주문가능현금)
     """
-    token = get_kis_token()
+    token = get_kis_token(real)
     if not token: return 0.0, 0.0
 
-    # 모의투자 잔고조회 TR ID: VTRP6504R / 실전: CTRP6504R
-    tr_id = "VTRP6504R" if KIS_BASE_URL == "https://openapivts.koreainvestment.com:29443" else "CTRP6504R"
-    
-    url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/inquire-present-balance"
-    headers = {
-        "Content-Type": "application/json",
-        "authorization": f"Bearer {token}",
-        "appKey": KIS_APP_KEY,
-        "appSecret": KIS_APP_SECRET,
-        "tr_id": tr_id
-    }
-    
-    params = {
-        "CANO": KIS_CANO,
-        "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
-        "WCRC_FRCR_DVSN_CD": "02", # 외화
-        "NATN_CD": "840", # 미국
-        "TR_MKET_CD": "00", 
-        "INQR_DVSN_CD": "00"
-    }
+    # 체결기준현재잔고조회 모의 TR ID: VTRP6504R / 실전: CTRP6504R
+    if not real:
+        tr_id = "VTRP6504R"
+        url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/inquire-present-balance"
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY,
+            "appSecret": KIS_APP_SECRET,
+            "tr_id": tr_id
+        }
+        
+        params = {
+            "CANO": KIS_CANO,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
+            "WCRC_FRCR_DVSN_CD": "02", # 외화
+            "NATN_CD": "840", # 미국
+            "TR_MKET_CD": "00", 
+            "INQR_DVSN_CD": "00"
+        }
+    else:
+        tr_id = "CTRP6504R"
+        url = f"{KIS_BASE_URL_REAL}/uapi/overseas-stock/v1/trading/inquire-present-balance"
+
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY_REAL,
+            "appSecret": KIS_APP_SECRET_REAL,
+            "tr_id": tr_id
+        }
+
+        params = {
+            "CANO": KIS_CANO_REAL,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
+            "WCRC_FRCR_DVSN_CD": "02", # 외화
+            "NATN_CD": "840", # 미국
+            "TR_MKET_CD": "00", 
+            "INQR_DVSN_CD": "00"
+        }
 
     try:
         res = requests.get(url, headers=headers, params=params)
@@ -87,14 +128,16 @@ def get_account_balance():
         # output2: 계좌 상세 자산 내역
         output3 = data['output3']
         
-        # ovrs_tot_pfls_amt: 해외주식 평가 금액 (주식 가치)
-        # frcr_drwg_psbl_amt_1: 외화 예수금 (현금)
-        stock_val = float(output3.get('evlu_amt_smtl', 0))
-        cash_val = float(output3.get('frcr_evlu_tota', 0))
+        if real:
+            stock_val = float(output3.get('pchs_amt_smtl', 0))
+            cash_val = float(output3.get('frcr_use_psbl_amt', 0))
+        else:
+            stock_val = float(output3.get('pchs_amt_smtl', 0))
+            cash_val = float(output3.get('frcr_evlu_tota', 0))
         
         total_asset = stock_val + cash_val # 총 자산
 
-        print(f"💰 [잔고조회 완료] {total_asset:.2f}")
+        print(f"💰 [잔고조회 완료] {total_asset:.2f}원 | 주문가능 현금: {cash_val:.2f}원")
         
         return total_asset, cash_val
 
@@ -102,33 +145,53 @@ def get_account_balance():
         print(f"❌ [잔고조회 에러] {e}")
         return 0.0, 0.0
 
-def send_buy_order(ticker, price, qty, exchange="NAS"):
+def send_buy_order(ticker, price, qty, exchange="NAS", real:bool=False):
     """지정가 매수 주문"""
-    token = get_kis_token()
+    token = get_kis_token(real)
     if not token: return False
     
-    # [중요] 모의투자 매수 TR ID: JTTT1002U / 실전: TTTT1002U
-    tr_id = "VTTT1002U"
-
-    url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order"
-    headers = {
-        "Content-Type": "application/json",
-        "authorization": f"Bearer {token}",
-        "appKey": KIS_APP_KEY,
-        "appSecret": KIS_APP_SECRET,
-        "tr_id": tr_id, 
-    }
-    
-    body = {
-        "CANO": KIS_CANO,
-        "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
-        "OVRS_EXCG_CD": exchange,  # 기본 나스닥 설정 (필요 시 로직 추가)
-        "PDNO": ticker,
-        "ORD_QTY": str(qty),
-        "OVRS_ORD_UNPR": str(price),
-        "ORD_SVR_DVSN_CD": "0",
-        "ORD_DVSN": "00"        # 00: 지정가
-    }
+    # [중요] 모의투자 매수 TR ID: VTTT1002U / 실전: TTTT1002U
+    if real:
+        tr_id = "TTTT1002U "
+        url = f"{KIS_BASE_URL_REAL}/uapi/overseas-stock/v1/trading/order"
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY_REAL,
+            "appSecret": KIS_APP_SECRET_REAL,
+            "tr_id": tr_id,
+        }
+        body = {
+            "CANO": KIS_CANO_REAL,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
+            "OVRS_EXCG_CD": exchange,
+            "PDNO": ticker,
+            "ORD_QTY": str(int(qty)),
+            "OVRS_ORD_UNPR": str(price),
+            "ORD_SVR_DVSN_CD": "0",
+            "ORD_DVSN": "00"        # 00: 지정가
+        }
+    else:
+        tr_id = "VTTT1002U"
+        url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order"
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY,
+            "appSecret": KIS_APP_SECRET,
+            "tr_id": tr_id, 
+        }
+        
+        body = {
+            "CANO": KIS_CANO,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
+            "OVRS_EXCG_CD": exchange,  # 기본 나스닥 설정 (필요 시 로직 추가)
+            "PDNO": ticker,
+            "ORD_QTY": str(int(qty)),
+            "OVRS_ORD_UNPR": str(price),
+            "ORD_SVR_DVSN_CD": "0",
+            "ORD_DVSN": "00"        # 00: 지정가
+        }
 
     try:
         res = requests.post(url, headers=headers, data=json.dumps(body))
@@ -143,36 +206,55 @@ def send_buy_order(ticker, price, qty, exchange="NAS"):
         print(f"❌ [API오류] {e}")
         return False
     
-def send_sell_order(ticker, price, qty, exchange="NAS"):
+def send_sell_order(ticker, price, qty, exchange="NAS", real:bool=False):
     """
     해외주식 지정가 매도 주문
     """
-    token = get_kis_token()
+    token = get_kis_token(real)
     if not token: return False
 
-    # [중요] 모의투자 매도 TR ID: JTTT1006U (실전: TTTT1006U)
-    tr_id = "VTTT1001U"
-
-    url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order"
+    # [중요] 모의투자 매도 TR ID: VTTT1001U (실전: TTTT1006U)
+    if real:
+        tr_id = "TTTT1006U"
+        url = f"{KIS_BASE_URL_REAL}/uapi/overseas-stock/v1/trading/order"
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY_REAL,
+            "appSecret": KIS_APP_SECRET_REAL,
+            "tr_id": tr_id
+        }
+        body = {
+            "CANO": KIS_CANO_REAL,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
+            "OVRS_EXCG_CD": exchange,
+            "PDNO": ticker,
+            "ORD_QTY": str(int(qty)),
+            "OVRS_ORD_UNPR": str(round(price*0.98,2)), # 현재가보다 2% 낮게 주문
+            "ORD_SVR_DVSN_CD": "0",
+            "ORD_DVSN": "00"           # 00: 지정가
+        }
     
-    headers = {
-        "Content-Type": "application/json",
-        "authorization": f"Bearer {token}",
-        "appKey": KIS_APP_KEY,
-        "appSecret": KIS_APP_SECRET,
-        "tr_id": tr_id  # <--- 매도용 ID 확인
-    }
-    
-    body = {
-        "CANO": KIS_CANO,
-        "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
-        "OVRS_EXCG_CD": exchange,
-        "PDNO": ticker,
-        "ORD_QTY": str(int(qty)),  # 수량은 반드시 정수 문자열
-        "OVRS_ORD_UNPR": str(price),
-        "ORD_SVR_DVSN_CD": "0",
-        "ORD_DVSN": "00"           # 00: 지정가
-    }
+    else:
+        tr_id = "VTTT1001U"
+        url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order"
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY,
+            "appSecret": KIS_APP_SECRET,
+            "tr_id": tr_id  # <--- 매도용 ID 확인
+        }
+        body = {
+            "CANO": KIS_CANO,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
+            "OVRS_EXCG_CD": exchange,
+            "PDNO": ticker,
+            "ORD_QTY": str(int(qty)),  # 수량은 반드시 정수 문자열
+            "OVRS_ORD_UNPR": str(round(price*0.98,2)),
+            "ORD_SVR_DVSN_CD": "0",
+            "ORD_DVSN": "00"           # 00: 지정가
+        }
 
     try:
         res = requests.post(url, headers=headers, data=json.dumps(body))
@@ -188,35 +270,52 @@ def send_sell_order(ticker, price, qty, exchange="NAS"):
         print(f"❌ [API오류] {e}")
         return False
 
-def get_stock_quantity():
+def get_stock_quantity(real:bool=False):
     """
-    특정 종목의 보유 수량 조회 (매도 전 확인용)
+    계좌 전체 보유 수량 조회 (매도 전 확인용)
     return: 보유수량 (int)
     """
-    token = get_kis_token()
+    token = get_kis_token(real)
     if not token: return 0
 
     # 잔고 조회 TR 사용 (모의: VTTS3012R)
-    tr_id = "VTTS3012R"
-    
-    url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/inquire-balance"
-    headers = {
-        "Content-Type": "application/json",
-        "authorization": f"Bearer {token}",
-        "appKey": KIS_APP_KEY,
-        "appSecret": KIS_APP_SECRET,
-        "tr_id": tr_id
-    }
-    
-    # 거래소 코드는 보유량 조회할 때 크게 중요하지 않음 (NAS로 통일)
-    params = {
-        "CANO": KIS_CANO,
-        "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
-        "OVRS_EXCG_CD": "NASD", 
-        "TR_CRCY_CD": "USD",
-        "CTX_AREA_FK200": "",
-        "CTX_AREA_NK200": ""
-    }
+    if real:
+        tr_id = "TTTS3012R"
+        url = f"{KIS_BASE_URL_REAL}/uapi/overseas-stock/v1/trading/inquire-balance"
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY_REAL,
+            "appSecret": KIS_APP_SECRET_REAL,
+            "tr_id": tr_id
+        }
+        params = {
+            "CANO": KIS_CANO_REAL,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
+            "OVRS_EXCG_CD": "NASD", 
+            "TR_CRCY_CD": "USD",
+            "CTX_AREA_FK200": "",
+            "CTX_AREA_NK200": ""
+        }
+
+    else:
+        tr_id = "VTTS3012R"
+        url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/inquire-balance"
+        headers = {
+            "Content-Type": "application/json",
+            "authorization": f"Bearer {token}",
+            "appKey": KIS_APP_KEY,
+            "appSecret": KIS_APP_SECRET,
+            "tr_id": tr_id
+        }
+        params = {
+            "CANO": KIS_CANO,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
+            "OVRS_EXCG_CD": "NASD", 
+            "TR_CRCY_CD": "USD",
+            "CTX_AREA_FK200": "",
+            "CTX_AREA_NK200": ""
+        }
 
     try:
         res = requests.get(url, headers=headers, params=params)
@@ -234,7 +333,7 @@ def get_stock_quantity():
 
 ## 매수 주문 미체결 수량 조회
 def get_unfilled_quantity(real: bool = False):
-    token = get_kis_token()
+    token = get_kis_token(real)
     if not token: return 0
 
     ## 모의투자
@@ -294,19 +393,19 @@ def get_unfilled_quantity(real: bool = False):
     else:
         # 해외주식 미체결내역 tr id : TTTS3018R
         tr_id = "TTTS3018R"
-        url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/inquire-nccs"
+        url = f"{KIS_BASE_URL_REAL}/uapi/overseas-stock/v1/trading/inquire-nccs"
 
         headers = {
             "Content-Type": "application/json",
             "authorization": f"Bearer {token}",
-            "appKey": KIS_APP_KEY,
-            "appSecret": KIS_APP_SECRET,
+            "appKey": KIS_APP_KEY_REAL,
+            "appSecret": KIS_APP_SECRET_REAL,
             "tr_id": tr_id
         }
 
         params = {
-            "CANO": KIS_CANO,
-            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
+            "CANO": KIS_CANO_REAL,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
             "OVRS_EXCG_CD": "NADS",
             "SORT_SQN": "DS",
             "CTX_AREA_FK200": "",
@@ -321,7 +420,7 @@ def get_unfilled_quantity(real: bool = False):
                 output = data['output']
                 outputs = []
                 for ord in output:
-                    if ord['nccs_qty'] > 0:
+                    if ord['nccs_qty'] > 0 and ord['sll_buy_dvsn_cd'] == "02":
                         outputs.append(ord)
 
                 return outputs
@@ -332,33 +431,56 @@ def get_unfilled_quantity(real: bool = False):
             return 0
 
 # 주문 취소
-def cancel_order(ticker, order_no, qty):
-    token = get_kis_token()
+def cancel_order(ticker, order_no, qty, real:bool=False):
+    token = get_kis_token(real)
     if not token: return False
 
     ## 모의투자
-    # tr_id: VTTT1004U
-    tr_id = "VTTT1004U"
-    url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order-rvsecncl"
+    if not real:
+        # tr_id: VTTT1004U
+        tr_id = "VTTT1004U"
+        url = f"{KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order-rvsecncl"
 
-    headers = {
+        headers = {
+                "Content-Type": "application/json",
+                "authorization": f"Bearer {token}",
+                "appKey": KIS_APP_KEY,
+                "appSecret": KIS_APP_SECRET,
+                "tr_id": tr_id
+            }
+
+        params = {
+            "CANO": KIS_CANO,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
+            "OVRS_EXCG_CD": "NADS",
+            "PDNO": ticker,
+            "ORGN_ODNO": order_no,
+            "RVSE_CNCL_DVSN_CD": "02", # 취소 02
+            "ORD_QTY": str(qty),
+            "OVRS_ORD_UNPR": "0"
+        }
+    else:
+        tr_id = "TTTT1004U"
+        url = f"{KIS_BASE_URL_REAL}/uapi/overseas-stock/v1/trading/order-rvsecncl"
+
+        headers = { 
             "Content-Type": "application/json",
             "authorization": f"Bearer {token}",
-            "appKey": KIS_APP_KEY,
-            "appSecret": KIS_APP_SECRET,
+            "appKey": KIS_APP_KEY_REAL,
+            "appSecret": KIS_APP_SECRET_REAL,
             "tr_id": tr_id
         }
 
-    params = {
-        "CANO": KIS_CANO,
-        "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
-        "OVRS_EXCG_CD": "NADS",
-        "PDNO": ticker,
-        "ORGN_ODNO": order_no,
-        "RVSE_CNCL_DVSN_CD": "02", # 취소 02
-        "ORD_QTY": str(qty),
-        "OVRS_ORD_UNPR": "0"
-    }
+        params = {
+            "CANO": KIS_CANO_REAL,
+            "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
+            "OVRS_EXCG_CD": "NADS",
+            "PDNO": ticker,
+            "ORGN_ODNO": order_no,
+            "RVSE_CNCL_DVSN_CD": "02", # 취소 02
+            "ORD_QTY": str(qty),
+            "OVRS_ORD_UNPR": "0"
+        }
 
     try:
         res = requests.post(url, headers=headers, params=params)
@@ -373,20 +495,88 @@ def cancel_order(ticker, order_no, qty):
         print(f"❌ [API오류] {e}")
         return False
 
+# 5분봉 데이터 조회
+def get_5m_candle_data(ticker,exchange, real:bool=False):
+    if not real:
+        # 모의투자는 지원하지 않음
+        print("❌ [KIS] 모의투자에서는 5분봉 데이터를 직접 조회할 수 없습니다.")
+        return False
+
+    token = get_kis_token(real)
+    if not token: return False
+
+    tr_id = 'HHDFS76950200'
+    url = f"{KIS_BASE_URL_REAL}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
+    headers = { 
+        "Content-Type": "application/json",
+        "authorization": f"Bearer {token}",
+        "appKey": KIS_APP_KEY_REAL,
+        "appSecret": KIS_APP_SECRET_REAL,
+        "tr_id": tr_id
+    }
+    params = {
+        "AUTH":"",
+        "EXCD":exchange,
+        "SYMB":ticker,
+        "NMIN":"5",
+        "PINC":"1",
+        "NEXT":"1",
+        "NERC":"120",
+        "FILL":"",
+        "KEYB":"20260114000000"
+    }
+
+    try:
+        res = requests.get(url, headers=headers, params=params)
+        data = res.json()
+
+        if data['rt_cd'] == '0':
+            price_data = data['output2']
+            print(json.dumps(data,indent=2))
+
+            # to yf style df
+            # date column : kymd
+            # time column : khms
+            # open high low last --> Open High Low Close
+            df = pd.DataFrame(price_data)
+            df.rename(columns={'kymd': 'Date', 'khms': 'Time',
+                               'open': 'Open', 'high': 'High',
+                               'low': 'Low','last': 'Close'}, inplace=True)
+            
+            return df
+        else:
+            print(f"❌ [주문실패] {ticker}: {data['msg1']} (Code: {data['msg_cd']})")
+            return False
+        
+    except Exception as e:
+        print(f"❌ [API오류] {e}")
+        return False
+
 
 
 if __name__ == "__main__":
     import json
-    get_kis_token()
-    total, orderable = get_account_balance()
-    hold = get_stock_quantity()
+    import yfinance as yf
+    # json_str = "{'pchs_amt_smtl': '195380412', 'evlu_amt_smtl': '123605717', 'evlu_pfls_amt_smtl': '-71774695', 'dncl_amt': '0', 'cma_evlu_amt': '0', 'tot_dncl_amt': '0', 'etc_mgna': '0', 'wdrw_psbl_tot_amt': '0', 'frcr_evlu_tota': '168397959', 'evlu_erng_rt1': '0.0000000000', 'pchs_amt_smtl_amt': '195380412', 'evlu_amt_smtl_amt': '123605717', 'tot_evlu_pfls_amt': '-71774695.26603001', 'tot_asst_amt': '292003677', 'buy_mgn_amt': '0', 'mgna_tota': '0', 'frcr_use_psbl_amt': '0.00', 'ustl_sll_amt_smtl': '0', 'ustl_buy_amt_smtl': '0', 'tot_frcr_cblc_smtl': '0.000000', 'tot_loan_amt': '0'}"
 
-    print(total)
-    print(orderable)
-    print(json.dumps(hold, indent=2))
+    # print(json.loads(json_str))
+    # get_kis_token(True)
 
-    send_sell_order('BIYA','4','5251','NASD')
-    send_sell_order('BNAI','4','1878','NASD')
-    send_sell_order('EVTV','2','7001','NASD')
-    send_sell_order('SEGG','1','20310','NASD')
+    
+    _5m_price = get_5m_candle_data('TSLA','NASD', True)
+    print(_5m_price.head(5))
 
+    yf_5m = yf.download("BIYA",progress=False,prepost=True,multi_level_index=False)
+    print(yf_5m.head(5))
+
+    # total, orderable = get_account_balance(True)
+    # # hold = get_stock_quantity()
+
+    # print(total)
+    # print(orderable)
+    # print(json.dumps(hold, indent=2))
+
+    # send_sell_order('BIYA','4','5251','NASD')
+    # send_sell_order('BNAI','4','1878','NASD')
+    # send_sell_order('EVTV','2','7001','NASD')
+    # send_sell_order('SEGG','1','20310','NASD')

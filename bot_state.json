@@ -1,5 +1,24 @@
 {
-  "updated_at": "2026-01-20T18:48:08",
-  "acc_stock": {},
-  "pending_orders": {}
+  "updated_at": "2026-01-21T00:06:57",
+  "acc_stock": {
+    "EVTV": {
+      "avg_pric": 4.07,
+      "qty": 4,
+      "excg": "NASD",
+      "stage": 0,
+      "max_profit": 3.4152361333223693
+    }
+  },
+  "pending_orders": {
+    "IVF": {
+      "order_price": 3.64,
+      "qty": 3,
+      "order_no": "0030324049"
+    },
+    "SHPH": {
+      "order_price": 3.35,
+      "qty": 2,
+      "order_no": "0030324094"
+    }
+  }
 }

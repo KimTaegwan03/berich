@@ -199,6 +199,7 @@ async def sync_account_data_safe(real:bool=False):
         PENDING_ORDERS = NEW_PENDING
         ACC_STOCK = NEW_ACC
 
+
 async def crawler_loop():
     print(f"🐢 [Crawler] 정찰병 시작 (주기: {CRAWL_INTERVAL_SEC}초)")
     global GLOBAL_TARGET_TICKERS
@@ -226,22 +227,28 @@ async def trading_bot_loop(real:bool=False):
 
     # ACC_STOCK 초기화
     global ACC_STOCK, PENDING_ORDERS
-    ACC_STOCK = {}
-    PENDING_ORDERS = {}
+
+    async with STATE_LOCK:
+        ACC_STOCK = {}
+        PENDING_ORDERS = {}
+
     # get_kis_token(real)
 
     holdings = get_stock_quantity(real)
     if holdings:
-        for stock in holdings:
-            ticker = stock['ovrs_pdno']        # 티커
-            qty = int(stock['ord_psbl_qty'])   # 수량
-            if qty > 0:
-                avg_price = float(stock['pchs_avg_pric']) # 평단가
-                excg_code = stock['ovrs_excg_cd']         # 거래소코드 (NAS/NYS 등)
-                
+        async with STATE_LOCK:
+            for stock in holdings:
+                ticker = stock['ovrs_pdno']
+                qty = int(stock['ord_psbl_qty'])
+                if qty <= 0:
+                    continue
+
+                avg_price = float(stock['pchs_avg_pric'])
+                excg_code = stock['ovrs_excg_cd']
+
                 ACC_STOCK[ticker] = {
-                    "avg_pric": avg_price, 
-                    "qty": qty, 
+                    "avg_pric": avg_price,
+                    "qty": qty,
                     "excg": excg_code,
                     "stage": 0,
                     "max_profit": -999.0
@@ -250,22 +257,19 @@ async def trading_bot_loop(real:bool=False):
     # 지정가 구매 주문 내역 불러오기
     unfilled_orders = get_unfilled_quantity(real)
     if unfilled_orders:
-        for order in unfilled_orders:
-            ticker = order['pdno']
-            # ord_date = order['ord_dt']
-            # ord_time = order['ord_tmd']
-            price = float(order['ovrs_ord_unpr'])
-            qty = int(order['nccs_qty'])
-            excg = order['ovrs_excg_cd']
-            PENDING_ORDERS[ticker] = {
-                "order_price": float(order['ovrs_ord_unpr']),
-                "qty": int(order['nccs_qty']),
-                "order_no": order['odno'] # 주문번호 (나중에 취소할 때 필요)
-            }
+        async with STATE_LOCK:
+            for order in unfilled_orders:
+                ticker = order['pdno']
+                PENDING_ORDERS[ticker] = {
+                    "order_price": float(order['ovrs_ord_unpr']),
+                    "qty": int(order['nccs_qty']),
+                    "order_no": order['odno'],
+                }
     
     # 총 슬롯 사용량 계산
-    total_slots = len(ACC_STOCK) + len(PENDING_ORDERS)
-    print(f"💼 [로드 완료] 보유: {len(ACC_STOCK)}개 / 미체결: {len(PENDING_ORDERS)}개 (총 {total_slots} 슬롯 사용)")
+    async with STATE_LOCK:
+        total_slots = len(ACC_STOCK) + len(PENDING_ORDERS)
+        print(f"💼 [로드 완료] 보유: {len(ACC_STOCK)}개 / 미체결: {len(PENDING_ORDERS)}개 (총 {total_slots} 슬롯 사용)")
 
     while True:
         try:
@@ -360,13 +364,13 @@ async def trading_bot_loop(real:bool=False):
                         
                         # 5. 주문 전송
                         kis_exchange = map_exchange_code(toss_exchange)
-                        success = send_buy_order(ticker, order_price, qty, kis_exchange, real)
+                        success, odno = send_buy_order(ticker, order_price, qty, kis_exchange, real)
                         
                         if success:
                             PENDING_ORDERS[ticker] = {
                                 "order_price": order_price,
                                 "qty": qty,
-                                "order_no": None}
+                                "order_no": odno}
                     
                 except Exception as e:
                     continue # 개별 종목 에러 무시

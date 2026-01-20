@@ -145,10 +145,10 @@ def get_account_balance(real:bool=False):
         print(f"❌ [잔고조회 에러] {e}")
         return 0.0, 0.0
 
-def send_buy_order(ticker, price, qty, exchange="NAS", real:bool=False):
+def send_buy_order(ticker, price, qty, exchange="NASD", real:bool=False):
     """지정가 매수 주문"""
     token = get_kis_token(real)
-    if not token: return False
+    if not token: return False, 0
     
     # [중요] 모의투자 매수 TR ID: VTTT1002U / 실전: TTTT1002U
     if real:
@@ -198,15 +198,15 @@ def send_buy_order(ticker, price, qty, exchange="NAS", real:bool=False):
         data = res.json()
         if data['rt_cd'] == '0':
             print(f"✅ [주문성공] {ticker} ${price} / {qty}주 (주문번호: {data['output']['ODNO']})")
-            return True
+            return True, data['output']['ODNO']
         else:
             print(f"❌ [주문실패] {ticker}: {data['msg1']} (Code: {data['msg_cd']})")
-            return False
+            return False, 0
     except Exception as e:
         print(f"❌ [API오류] {e}")
-        return False
+        return False, 0
     
-def send_sell_order(ticker, price, qty, exchange="NAS", real:bool=False):
+def send_sell_order(ticker, price, qty, exchange="NASD", real:bool=False):
     """
     해외주식 지정가 매도 주문
     """
@@ -379,7 +379,7 @@ def get_unfilled_quantity(real: bool = False):
 
                 outputs = []
                 for ord in output:
-                    if ord['nccs_qty'] > 0 and ord['sll_buy_dvsn_cd'] == "02":
+                    if int(ord['nccs_qty']) > 0 and ord['sll_buy_dvsn_cd'] == "02":
                         outputs.append(ord)
 
                 return outputs
@@ -406,7 +406,7 @@ def get_unfilled_quantity(real: bool = False):
         params = {
             "CANO": KIS_CANO_REAL,
             "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
-            "OVRS_EXCG_CD": "NADS",
+            "OVRS_EXCG_CD": "NASD",
             "SORT_SQN": "DS",
             "CTX_AREA_FK200": "",
             "CTX_AREA_NK200": ""
@@ -420,7 +420,7 @@ def get_unfilled_quantity(real: bool = False):
                 output = data['output']
                 outputs = []
                 for ord in output:
-                    if ord['nccs_qty'] > 0 and ord['sll_buy_dvsn_cd'] == "02":
+                    if int(ord['nccs_qty']) > 0 and ord['sll_buy_dvsn_cd'] == "02":
                         outputs.append(ord)
 
                 return outputs
@@ -452,7 +452,7 @@ def cancel_order(ticker, order_no, qty, real:bool=False):
         params = {
             "CANO": KIS_CANO,
             "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD,
-            "OVRS_EXCG_CD": "NADS",
+            "OVRS_EXCG_CD": "NASD",
             "PDNO": ticker,
             "ORGN_ODNO": order_no,
             "RVSE_CNCL_DVSN_CD": "02", # 취소 02
@@ -474,7 +474,7 @@ def cancel_order(ticker, order_no, qty, real:bool=False):
         params = {
             "CANO": KIS_CANO_REAL,
             "ACNT_PRDT_CD": KIS_ACNT_PRDT_CD_REAL,
-            "OVRS_EXCG_CD": "NADS",
+            "OVRS_EXCG_CD": "NASD",
             "PDNO": ticker,
             "ORGN_ODNO": order_no,
             "RVSE_CNCL_DVSN_CD": "02", # 취소 02
@@ -542,17 +542,21 @@ if __name__ == "__main__":
     # json_str = "{'pchs_amt_smtl': '195380412', 'evlu_amt_smtl': '123605717', 'evlu_pfls_amt_smtl': '-71774695', 'dncl_amt': '0', 'cma_evlu_amt': '0', 'tot_dncl_amt': '0', 'etc_mgna': '0', 'wdrw_psbl_tot_amt': '0', 'frcr_evlu_tota': '168397959', 'evlu_erng_rt1': '0.0000000000', 'pchs_amt_smtl_amt': '195380412', 'evlu_amt_smtl_amt': '123605717', 'tot_evlu_pfls_amt': '-71774695.26603001', 'tot_asst_amt': '292003677', 'buy_mgn_amt': '0', 'mgna_tota': '0', 'frcr_use_psbl_amt': '0.00', 'ustl_sll_amt_smtl': '0', 'ustl_buy_amt_smtl': '0', 'tot_frcr_cblc_smtl': '0.000000', 'tot_loan_amt': '0'}"
 
     # print(json.loads(json_str))
-    # get_kis_token(True)
+    get_kis_token(True)
 
     
-    _5m_price = get_current_price('TSLA','NASD', True)
+    _5m_price = get_current_price('TSLA','NAS', True)
     print(_5m_price)
 
     # yf_5m = yf.download("BIYA",progress=False,prepost=True,multi_level_index=False)
     # print(yf_5m.head(5))
 
     # total, orderable = get_account_balance(True)
-    # # hold = get_stock_quantity()
+    hold = get_stock_quantity(True)
+    unfilled = get_unfilled_quantity(True)
+
+    print(hold)
+    print(unfilled)
 
     # print(total)
     # print(orderable)

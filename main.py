@@ -27,8 +27,8 @@ STATE_LOCK = asyncio.Lock()
 CRAWL_INTERVAL_SEC = 120  # [정찰병] 크롤링 주기 (3분) -> 밴 방지!
 TRADE_INTERVAL_SEC = 20   # [스나이퍼] 매매 주기 (15초) -> 급등주 대응!
 
-MAX_SLOTS = 10
-BUY_PERCENT = 9.5
+MAX_SLOTS = 3
+BUY_PERCENT = 30
 
 GLOBAL_TARGET_TICKERS = []
 
@@ -57,7 +57,7 @@ MIN_REMAIN_SHARES = 1           # stage 1~4에서는 최소 1주 남기기(전�
 
 LOSS_RATIO = 10  # %
 
-SIGNAL_N = 7 # Flat 유지 기간
+SIGNAL_N = 5 # Flat 유지 기간
 SIGNAL_K = 2 # 오차 범위 (%)
 ORDER_LIFETIME_LIMIT = 2 * 60 * 60 # 2시간
 
@@ -124,7 +124,7 @@ def save_bot_state():
             pass
         raise
 
-def fetch_account_snapshot():
+def fetch_account_snapshot(real:bool=False):
     """
     API에서 실시간 잔고와 미체결 내역을 가져와서
     ACC_STOCK(보유)과 PENDING_ORDERS(미체결)를 최신 상태로 동기화함.
@@ -132,12 +132,12 @@ def fetch_account_snapshot():
     """
     global ACC_STOCK, PENDING_ORDERS
 
-    real_holdings = get_stock_quantity()
-    real_unfilled = get_unfilled_quantity(False)
+    real_holdings = get_stock_quantity(real)
+    real_unfilled = get_unfilled_quantity(real)
 
     return real_holdings, real_unfilled
   
-async def sync_account_data_safe():
+async def sync_account_data_safe(real:bool=False):
     """
     이벤트 루프에서 실행: 스레드에서 가져온 스냅샷을 락 걸고 전역 상태에 반영
     stage/max_profit 보존
@@ -146,7 +146,7 @@ async def sync_account_data_safe():
 
     print("🔄 [Sync] 계좌 동기화 진행 중...")
 
-    real_holdings, real_unfilled = await asyncio.to_thread(fetch_account_snapshot)
+    real_holdings, real_unfilled = await asyncio.to_thread(fetch_account_snapshot, real=real)
 
     # ---- 미체결 동기화 ----
     NEW_PENDING = {}
@@ -221,15 +221,15 @@ async def crawler_loop():
         # 3분 휴식 (밴 방지 핵심)
         await asyncio.sleep(CRAWL_INTERVAL_SEC)
 
-async def trading_bot_loop():
+async def trading_bot_loop(real:bool=False):
     print("🚀 [System] 자동매매 봇이 백그라운드에서 시작되었습니다.")
 
     # ACC_STOCK 초기화
     global ACC_STOCK
     ACC_STOCK = {}
-    get_kis_token()
+    # get_kis_token(real)
 
-    holdings = get_stock_quantity()
+    holdings = get_stock_quantity(real)
     if holdings:
         for stock in holdings:
             ticker = stock['ovrs_pdno']        # 티커
@@ -247,7 +247,7 @@ async def trading_bot_loop():
                 }
     
     # 지정가 구매 주문 내역 불러오기
-    unfilled_orders = get_unfilled_quantity(False)
+    unfilled_orders = get_unfilled_quantity(real)
     if unfilled_orders:
         for order in unfilled_orders:
             ticker = order['pdno']
@@ -270,12 +270,12 @@ async def trading_bot_loop():
         try:
             #### 매수 루프 ####
             # 1. KIS 토큰 점검
-            get_kis_token()
+            get_kis_token(real)
 
-            await sync_account_data_safe()
+            await sync_account_data_safe(real)
 
             # 오래된 지정가 주문내역 취소
-            unfilled_orders = get_unfilled_quantity(False)
+            unfilled_orders = get_unfilled_quantity(real)
             if unfilled_orders:
                 for order in unfilled_orders:
                     ticker = order['pdno']
@@ -290,7 +290,7 @@ async def trading_bot_loop():
                     if diff > timedelta(seconds=ORDER_LIFETIME_LIMIT):
                         ord_no = order['odno']
 
-                        success = cancel_order(ticker, ord_no, qty)
+                        success = cancel_order(ticker, ord_no, qty, real)
                         if success:
                             if ticker in PENDING_ORDERS:
                                 del PENDING_ORDERS[ticker]
@@ -328,7 +328,7 @@ async def trading_bot_loop():
                         # [핵심] 자산 대비 수량 계산 로직
                         # ==================================================
                         # 1. 내 계좌 총 자산 조회 (주식평가금 + 현금)
-                        total_asset, orderable_cash = get_account_balance()
+                        total_asset, orderable_cash = get_account_balance(real)
 
                         total_asset = total_asset / 1500 # 환율 적용
                         orderable_cash = orderable_cash / 1500 # 환율 적용
@@ -359,7 +359,7 @@ async def trading_bot_loop():
                         
                         # 5. 주문 전송
                         kis_exchange = map_exchange_code(toss_exchange)
-                        success = send_buy_order(ticker, order_price, qty, kis_exchange)
+                        success = send_buy_order(ticker, order_price, qty, kis_exchange, real)
                         
                         if success:
                             PENDING_ORDERS[ticker] = {
@@ -405,20 +405,20 @@ async def trading_bot_loop():
                     # -------------------------------------------------------
                     if profit_pct <= -10.0:
                         print(f"❌ [손절] {ticker} -10% 도달.. 전량 매도")
-                        if send_sell_order(ticker, curr_price, qty, excg):
+                        if send_sell_order(ticker, curr_price, qty, excg, real):
                             del ACC_STOCK[ticker]
                         continue
 
                     if stage == 0 and info["max_profit"] >= 15.0 and profit_pct <= 1.0:
                         print(f"🛡️ [본절 스탑] {ticker} +15% 찍고 하락..")
-                        if send_sell_order(ticker, curr_price, qty, excg): del ACC_STOCK[ticker]
+                        if send_sell_order(ticker, curr_price, qty, excg, real): del ACC_STOCK[ticker]
                         continue
 
                     if stage >= 1:
                         dd = TRAILING_DD.get(stage, None)
                         if dd is not None and (max_p - profit_pct) >= dd:
                             print(f"📉 [트레일링 스탑] {ticker} stage={stage} max={max_p:.2f}% -> now={profit_pct:.2f}% (DD {dd}%) 전량 매도")
-                            if send_sell_order(ticker, curr_price, qty, excg):
+                            if send_sell_order(ticker, curr_price, qty, excg, real):
                                 del ACC_STOCK[ticker]
                             continue
 
@@ -444,7 +444,7 @@ async def trading_bot_loop():
                             print(f"💰 [분할익절] {ticker} stage {cur_stage}->{target_stage} "
                                 f"profit={profit_pct:.2f}% trigger={trigger_profit}% sell={sell_qty}/{cur_qty}")
 
-                            if send_sell_order(ticker, curr_price, sell_qty, excg):
+                            if send_sell_order(ticker, curr_price, sell_qty, excg, real):
                                 # 주문 성공 반영
                                 cur_qty -= sell_qty
                                 ACC_STOCK[ticker]["qty"] = cur_qty

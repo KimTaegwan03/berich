@@ -495,18 +495,18 @@ def cancel_order(ticker, order_no, qty, real:bool=False):
         print(f"❌ [API오류] {e}")
         return False
 
-# 5분봉 데이터 조회
-def get_5m_candle_data(ticker,exchange, real:bool=False):
+# 현재가 데이터 조회
+def get_current_price(ticker,exchange, real:bool=False):
     if not real:
         # 모의투자는 지원하지 않음
-        print("❌ [KIS] 모의투자에서는 5분봉 데이터를 직접 조회할 수 없습니다.")
+        print("❌ [KIS] 모의투자에서는 현재가 데이터를 직접 조회할 수 없습니다.")
         return False
 
     token = get_kis_token(real)
     if not token: return False
 
-    tr_id = 'HHDFS76950200'
-    url = f"{KIS_BASE_URL_REAL}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
+    tr_id = 'HHDFS76200200'
+    url = f"{KIS_BASE_URL_REAL}/uapi/overseas-price/v1/quotations/price-detail"
     headers = { 
         "Content-Type": "application/json",
         "authorization": f"Bearer {token}",
@@ -518,34 +518,16 @@ def get_5m_candle_data(ticker,exchange, real:bool=False):
         "AUTH":"",
         "EXCD":exchange,
         "SYMB":ticker,
-        "NMIN":"5",
-        "PINC":"1",
-        "NEXT":"1",
-        "NERC":"120",
-        "FILL":"",
-        "KEYB":"20260114000000"
     }
 
     try:
         res = requests.get(url, headers=headers, params=params)
         data = res.json()
-
         if data['rt_cd'] == '0':
-            price_data = data['output2']
-            print(json.dumps(data,indent=2))
-
-            # to yf style df
-            # date column : kymd
-            # time column : khms
-            # open high low last --> Open High Low Close
-            df = pd.DataFrame(price_data)
-            df.rename(columns={'kymd': 'Date', 'khms': 'Time',
-                               'open': 'Open', 'high': 'High',
-                               'low': 'Low','last': 'Close'}, inplace=True)
             
-            return df
+            return data['output']
         else:
-            print(f"❌ [주문실패] {ticker}: {data['msg1']} (Code: {data['msg_cd']})")
+            print(f"❌ [현재가조회실패] {ticker}: {data['msg1']} (Code: {data['msg_cd']})")
             return False
         
     except Exception as e:
@@ -563,11 +545,11 @@ if __name__ == "__main__":
     # get_kis_token(True)
 
     
-    _5m_price = get_5m_candle_data('TSLA','NASD', True)
-    print(_5m_price.head(5))
+    _5m_price = get_current_price('TSLA','NASD', True)
+    print(_5m_price)
 
-    yf_5m = yf.download("BIYA",progress=False,prepost=True,multi_level_index=False)
-    print(yf_5m.head(5))
+    # yf_5m = yf.download("BIYA",progress=False,prepost=True,multi_level_index=False)
+    # print(yf_5m.head(5))
 
     # total, orderable = get_account_balance(True)
     # # hold = get_stock_quantity()

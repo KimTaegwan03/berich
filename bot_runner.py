@@ -2,8 +2,11 @@
 import asyncio
 import traceback
 
-
 from main import trading_bot_loop, crawler_loop
+
+import dotenv
+dotenv.load_dotenv()
+
 
 async def run_forever():
     """
@@ -14,7 +17,7 @@ async def run_forever():
         print("🟢 [Runner] 봇 프로세스 시작")
         tasks = [
             asyncio.create_task(crawler_loop(), name="crawler_loop"),
-            asyncio.create_task(trading_bot_loop(), name="trading_bot_loop"),
+            asyncio.create_task(trading_bot_loop(True), name="trading_bot_loop"),
         ]
 
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)

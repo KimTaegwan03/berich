@@ -272,6 +272,50 @@ async def trading_bot_loop(real:bool=False):
         print(f"💼 [로드 완료] 보유: {len(ACC_STOCK)}개 / 미체결: {len(PENDING_ORDERS)}개 (총 {total_slots} 슬롯 사용)")
 
     while True:
+        # 시간대가 오후 6시~오후9시59분, 오후11시~익일오전2시 일때만 동작            
+        now = datetime.now().time()
+        if not (
+            (now >= datetime.strptime("18:00:00", "%H:%M:%S").time() and now <= datetime.strptime("21:59:59", "%H:%M:%S").time()) or
+            (now >= datetime.strptime("23:00:00", "%H:%M:%S").time() and now <= datetime.strptime("23:59:59", "%H:%M:%S").time()) or
+            (now >= datetime.strptime("00:00:00", "%H:%M:%S").time() and now <= datetime.strptime("02:00:00", "%H:%M:%S").time())
+            ):
+            print("😴 [Bot] 미국 주식 시장 운영 시간 외에는 대기합니다.")
+
+            # 만약 주식을 가지고 있거나, 미체결 내역이 있으면 팔기 및 취소하기            
+            if ACC_STOCK or PENDING_ORDERS:
+                print("⚠️ [Bot] 시장 운영 시간 외, 보유 종목 및 미체결 주문 정리 시도...")
+                
+                # 보유 종목 매도
+                for ticker, info in list(ACC_STOCK.items()):
+                    print(f"💰 [정리] {ticker} 보유 수량 {info['qty']}주 매도 시도...")
+                    # 현재가 조회 (실전 투자만 가능하므로 모의투자 시에는 임의 가격으로 매도 시도)
+                    current_price_data = get_current_price(ticker, info['excg'], real)
+                    if current_price_data:
+                        current_price = float(current_price_data['last'])
+                    else:
+                        # 모의투자이거나 현재가 조회 실패 시, 매수 평균가로 매도 시도 (손실 감수)
+                        current_price = info['avg_pric'] * 0.95 # 보수적으로 5% 낮은 가격으로 매도 시도
+                        print(f"⚠️ [정리] {ticker} 현재가 조회 실패, 평균가 {info['avg_pric']:.2f}의 95%인 {current_price:.2f}로 매도 시도")
+
+                    if send_sell_order(ticker, current_price, info['qty'], info['excg'], real):
+                        del ACC_STOCK[ticker]
+                        print(f"✅ [정리] {ticker} 매도 완료.")
+                    else:
+                        print(f"❌ [정리] {ticker} 매도 실패.")
+                
+                # 미체결 주문 취소
+                for ticker, order_info in list(PENDING_ORDERS.items()):
+                    print(f"🗑️ [정리] {ticker} 미체결 주문 {order_info['order_no']} 취소 시도...")
+                    if cancel_order(ticker, order_info['order_no'], order_info['qty'], real):
+                        del PENDING_ORDERS[ticker]
+                        print(f"✅ [정리] {ticker} 미체결 주문 취소 완료.")
+                    else:
+                        print(f"❌ [정리] {ticker} 미체결 주문 취소 실패.")
+
+            
+            await asyncio.sleep(600) # 10분 대기
+            continue
+
         try:
             #### 매수 루프 ####
             # 1. KIS 토큰 점검

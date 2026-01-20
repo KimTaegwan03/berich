@@ -225,8 +225,9 @@ async def trading_bot_loop(real:bool=False):
     print("🚀 [System] 자동매매 봇이 백그라운드에서 시작되었습니다.")
 
     # ACC_STOCK 초기화
-    global ACC_STOCK
+    global ACC_STOCK, PENDING_ORDERS
     ACC_STOCK = {}
+    PENDING_ORDERS = {}
     # get_kis_token(real)
 
     holdings = get_stock_quantity(real)
@@ -475,11 +476,11 @@ async def trading_bot_loop(real:bool=False):
 def map_exchange_code(toss_code):
     # Toss Code -> KIS Code
     mapping = {
-        "NSQ": "NAS", # 나스닥
-        "NYS": "NYS", # 뉴욕
-        "ASE": "AMS", # 아멕스 (확인 필요, 보통 AMS)
+        "NSQ": "NASD", # 나스닥
+        "NYS": "NYSE", # 뉴욕
+        "ASE": "AMEX", # 아멕스 (확인 필요, 보통 AMS)
     }
-    return mapping.get(toss_code, "NAS") # 모르면 일단 나스닥
+    return mapping.get(toss_code, "NASD") # 모르면 일단 나스닥
 
 
 # --- API Endpoints ---

@@ -152,7 +152,7 @@ def send_buy_order(ticker, price, qty, exchange="NAS", real:bool=False):
     
     # [중요] 모의투자 매수 TR ID: VTTT1002U / 실전: TTTT1002U
     if real:
-        tr_id = "TTTT1002U "
+        tr_id = "TTTT1002U"
         url = f"{KIS_BASE_URL_REAL}/uapi/overseas-stock/v1/trading/order"
         headers = {
             "Content-Type": "application/json",

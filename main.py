@@ -261,7 +261,7 @@ async def trading_bot_loop(real:bool=False):
             for order in unfilled_orders:
                 ticker = order['pdno']
                 PENDING_ORDERS[ticker] = {
-                    "order_price": float(order['ovrs_ord_unpr']),
+                    "order_price": float(order['ft_ord_unpr3']),
                     "qty": int(order['nccs_qty']),
                     "order_no": order['odno'],
                 }

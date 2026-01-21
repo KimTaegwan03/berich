@@ -151,17 +151,18 @@ if __name__ == "__main__":
     from datetime import timedelta
     from kis_api import get_5m_candles
 
-    
 
-    ticker = "BNAI"
+    ticker = "PAVM"
     excg = "NASD"
 
     prices = get_5m_candles(ticker, excg, real=True)
+    yf_prices = yf.download(ticker, interval="5m", period="5d", prepost=True, progress=False, multi_level_index=False)
 
+    print(yf_prices)
     print(prices)
 
     chart_data = ichimoku(prices, {"delta": timedelta(minutes=5)})
 
-    ichimoku_signal = span_b_signal(chart_data,7,2)
+    ichimoku_signal = span_b_signal(chart_data,5,2)
     print(ticker)
     print(ichimoku_signal)

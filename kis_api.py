@@ -594,6 +594,9 @@ def get_5m_candles(ticker, exchange, real:bool=False):
                 )
             df.set_index("Datetime", inplace=True)
 
+            # 순서 뒤집기
+            df = df.iloc[::-1]
+
             return df
         else:
             print(f"❌ [현재가조회실패]")

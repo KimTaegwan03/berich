@@ -275,7 +275,7 @@ async def trading_bot_loop(real:bool=False):
         # 시간대가 오후 6시~오후9시59분, 오후11시~익일오전2시 일때만 동작            
         now = datetime.now().time()
         print(f"[현재시각_디버깅용] {now}")
-        print(f"[시작시각_디버깅용] {datetime.strptime("18:00:00", "%H:%M:%S").time()}")
+        print(f"[시작시각_디버깅용] {datetime.strptime('18:00:00', '%H:%M:%S').time()}")
         if not (
             (now >= datetime.strptime("18:00:00", "%H:%M:%S").time() and now <= datetime.strptime("21:59:59", "%H:%M:%S").time()) or
             (now >= datetime.strptime("23:00:00", "%H:%M:%S").time() and now <= datetime.strptime("23:59:59", "%H:%M:%S").time()) or

@@ -27,8 +27,8 @@ STATE_LOCK = asyncio.Lock()
 CRAWL_INTERVAL_SEC = 120  # [정찰병] 크롤링 주기 (3분) -> 밴 방지!
 TRADE_INTERVAL_SEC = 20   # [스나이퍼] 매매 주기 (15초) -> 급등주 대응!
 
-MAX_SLOTS = 3
-BUY_PERCENT = 30
+MAX_SLOTS = 5
+BUY_PERCENT = 19
 
 GLOBAL_TARGET_TICKERS = []
 
@@ -36,11 +36,11 @@ GLOBAL_TARGET_TICKERS = []
 REMAINING_RATIO = {0: 1.0, 1: 0.70, 2: 0.50, 3: 0.30, 4: 0.15, 5: 0.0}
 PROFIT_STEPS = [
     # (target_stage, trigger_profit_pct, sell_ratio_on_init_qty)
-    (1, 30.0, 0.30),
-    (2, 60.0, 0.20),
+    (1, 15.0, 0.30),
+    (2, 50.0, 0.20),
     (3, 100.0, 0.20),
-    (4, 180.0, 0.15),
-    (5, 300.0, 0.15),
+    (4, 150.0, 0.15),
+    (5, 200.0, 0.15),
 ]
 
 # stage별 트레일링 드로다운(최고수익률 대비 몇 % 하락하면 전량 정리)
@@ -274,6 +274,8 @@ async def trading_bot_loop(real:bool=False):
     while True:
         # 시간대가 오후 6시~오후9시59분, 오후11시~익일오전2시 일때만 동작            
         now = datetime.now().time()
+        print(f"[현재시각_디버깅용] {now}")
+        print(f"[시작시각_디버깅용] {datetime.strptime("18:00:00", "%H:%M:%S").time()}")
         if not (
             (now >= datetime.strptime("18:00:00", "%H:%M:%S").time() and now <= datetime.strptime("21:59:59", "%H:%M:%S").time()) or
             (now >= datetime.strptime("23:00:00", "%H:%M:%S").time() and now <= datetime.strptime("23:59:59", "%H:%M:%S").time()) or

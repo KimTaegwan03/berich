@@ -154,7 +154,7 @@ async def sync_account_data_safe(real:bool=False):
         for order in real_unfilled:
             ticker = order['pdno']
             NEW_PENDING[ticker] = {
-                "order_price": float(order['ovrs_ord_unpr']),
+                "order_price": float(order['ft_ord_unpr3']),
                 "qty": int(order['nccs_qty']),
                 "order_no": order['odno']
             }

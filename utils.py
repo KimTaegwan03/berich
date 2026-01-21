@@ -149,15 +149,18 @@ def span_b_signal(data, n, k):
 if __name__ == "__main__":
     import yfinance as yf
     from datetime import timedelta
+    from kis_api import get_5m_candles
+
     
 
-    ticker = "SOWG"
+    ticker = "BNAI"
+    excg = "NASD"
 
-    df = yf.download(ticker, interval="5m", period="10d", prepost=True, progress=False, multi_level_index=False)
-    
-    config = {"label": "5분봉 (최근 10일)", "interval": "5m", "period": "10d", "delta": timedelta(minutes=5)}
+    prices = get_5m_candles(ticker, excg, real=True)
 
-    chart_data = ichimoku(df, config)
+    print(prices)
+
+    chart_data = ichimoku(prices, {"delta": timedelta(minutes=5)})
 
     ichimoku_signal = span_b_signal(chart_data,7,2)
     print(ticker)

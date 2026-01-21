@@ -263,7 +263,7 @@ async def trading_bot_loop(real:bool=False):
                 PENDING_ORDERS[ticker] = {
                     "order_price": float(order['ft_ord_unpr3']),
                     "qty": int(order['nccs_qty']),
-                    "order_no": order['odno'],
+                    "order_no": order['orgn_odno'],
                 }
     
     # 총 슬롯 사용량 계산
@@ -274,12 +274,12 @@ async def trading_bot_loop(real:bool=False):
     while True:
         # 시간대가 오후 6시~오후9시59분, 오후11시~익일오전2시 일때만 동작            
         now = datetime.now().time()
-        print(f"[현재시각_디버깅용] {now}")
-        print(f"[시작시각_디버깅용] {datetime.strptime('18:00:00', '%H:%M:%S').time()}")
+        # print(f"[현재시각_디버깅용] {now}")
+        # print(f"[시작시각_디버깅용] {datetime.strptime('18:00:00', '%H:%M:%S').time()}")
         if not (
             (now >= datetime.strptime("18:00:00", "%H:%M:%S").time() and now <= datetime.strptime("21:59:59", "%H:%M:%S").time()) or
             (now >= datetime.strptime("23:00:00", "%H:%M:%S").time() and now <= datetime.strptime("23:59:59", "%H:%M:%S").time()) or
-            (now >= datetime.strptime("00:00:00", "%H:%M:%S").time() and now <= datetime.strptime("02:00:00", "%H:%M:%S").time())
+            (now >= datetime.strptime("00:00:00", "%H:%M:%S").time() and now <= datetime.strptime("05:00:00", "%H:%M:%S").time())
             ):
             print("😴 [Bot] 미국 주식 시장 운영 시간 외에는 대기합니다.")
 
@@ -336,10 +336,10 @@ async def trading_bot_loop(real:bool=False):
 
                     ord_datetime = datetime.strptime(f"{ord_date} {ord_time}", "%Y%m%d %H%M%S")
                     now = datetime.now()
-                    diff = now - ord_datetime
+                    diff = now - ord_datetime - timedelta(days=1)
 
                     if diff > timedelta(seconds=ORDER_LIFETIME_LIMIT):
-                        ord_no = order['odno']
+                        ord_no = order['orgn_odno']
 
                         success = cancel_order(ticker, ord_no, qty, real)
                         if success:
@@ -354,6 +354,7 @@ async def trading_bot_loop(real:bool=False):
             for item in current_targets:
                 ticker = item['ticker']
                 toss_exchange = item.get('exchange', 'NSQ')
+                kis_exchange = map_exchange_code(toss_exchange)
 
                 if (len(ACC_STOCK) + len(PENDING_ORDERS)) >= MAX_SLOTS:
                     break
@@ -362,7 +363,8 @@ async def trading_bot_loop(real:bool=False):
                     continue
 
                 try:
-                    df = yf.download(ticker, interval="5m", period="5d", prepost=True, progress=False, multi_level_index=False)
+                    # df = yf.download(ticker, interval="5m", period="5d", prepost=True, progress=False, multi_level_index=False)
+                    df = get_5m_candles(ticker, kis_exchange, real)
                     if len(df) < 60: continue
 
                     # 분석
@@ -409,7 +411,7 @@ async def trading_bot_loop(real:bool=False):
                         print(f"⚡ [SIGNAL] {ticker} ({toss_exchange}) 매수! ${order_price} x {qty}주 (비중 {BUY_PERCENT}%)")
                         
                         # 5. 주문 전송
-                        kis_exchange = map_exchange_code(toss_exchange)
+                        
                         success, odno = send_buy_order(ticker, order_price, qty, kis_exchange, real)
                         
                         if success:
@@ -439,10 +441,12 @@ async def trading_bot_loop(real:bool=False):
                 
                 try:
                     # 현재가 조회
-                    df = await asyncio.to_thread(yf.download, ticker, interval="5m", period="1d", prepost=True, progress=False, multi_level_index=False)
+                    # df = await asyncio.to_thread(yf.download, ticker, interval="5m", period="1d", prepost=True, progress=False, multi_level_index=False)
+                    df = await asyncio.to_thread(get_current_price, ticker, excg, real)
+                    
                     if len(df) < 1: continue
 
-                    curr_price = float(df['Close'].iloc[-1])
+                    curr_price = float(df['last'])
                     profit_pct = ((curr_price - avg_price) / avg_price) * 100
 
                     # 최고 수익률 갱신 (트레일링 스탑용)
@@ -528,7 +532,7 @@ def map_exchange_code(toss_code):
     mapping = {
         "NSQ": "NASD", # 나스닥
         "NYS": "NYSE", # 뉴욕
-        "ASE": "AMEX", # 아멕스 (확인 필요, 보통 AMS)
+        "AMX": "AMEX", # 아멕스 (확인 필요, 보통 AMS)
     }
     return mapping.get(toss_code, "NASD") # 모르면 일단 나스닥
 

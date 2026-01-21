@@ -505,6 +505,15 @@ def get_current_price(ticker,exchange, real:bool=False):
     token = get_kis_token(real)
     if not token: return False
 
+    excd_mapping = {
+        "NASD": "NAS",
+        "NYSE": "NYS",
+        "AMEX": "AMS"
+    }
+
+    excg = excd_mapping.get(exchange, exchange)
+
+
     tr_id = 'HHDFS76200200'
     url = f"{KIS_BASE_URL_REAL}/uapi/overseas-price/v1/quotations/price-detail"
     headers = { 
@@ -516,7 +525,7 @@ def get_current_price(ticker,exchange, real:bool=False):
     }
     params = {
         "AUTH":"",
-        "EXCD":exchange,
+        "EXCD":excg,
         "SYMB":ticker,
     }
 
@@ -534,7 +543,68 @@ def get_current_price(ticker,exchange, real:bool=False):
         print(f"❌ [API오류] {e}")
         return False
 
+def get_5m_candles(ticker, exchange, real:bool=False):
+    if not real:
+        # 모의투자는 지원하지 않음
+        print("❌ [KIS] 모의투자에서는 현재가 데이터를 직접 조회할 수 없습니다.")
+        return False
 
+    token = get_kis_token(real)
+    if not token: return False
+
+    tr_id = "HHDFS76950200"
+    url = f"{KIS_BASE_URL_REAL}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
+    headers = { 
+        "Content-Type": "application/json",
+        "authorization": f"Bearer {token}",
+        "appKey": KIS_APP_KEY_REAL,
+        "appSecret": KIS_APP_SECRET_REAL,
+        "tr_id": tr_id
+    }
+
+    excd_mapping = {
+        "NASD": "NAS",
+        "NYSE": "NYS",
+        "AMEX": "AMS"
+    }
+
+    excg = excd_mapping.get(exchange, exchange)
+
+    params = {
+        "AUTH":"",
+        "EXCD":excg,
+        "SYMB":ticker,
+        "NMIN":"5",
+        "PINC":"1",
+        "NEXT":"",
+        "NREC":"120",
+        "FILL":"",
+        "KEYB":""
+        }
+    
+    try:
+        res = requests.get(url, headers=headers, params=params)
+        data = res.json()
+        if data['rt_cd'] == '0':
+            df = pd.DataFrame(data['output2'])
+            df.rename({'open':'Open','high':'High','low':'Low','last':'Close','evol':'Volume'}, inplace=True, axis=1)
+            df["Datetime"] = pd.to_datetime(
+                    df["kymd"].astype(str) + df["khms"].astype(str).str.zfill(6),
+                    format="%Y%m%d%H%M%S"
+                )
+            df.set_index("Datetime", inplace=True)
+
+            return df
+        else:
+            print(f"❌ [현재가조회실패]")
+            return False
+    except Exception as e:
+        print(f"❌ [API오류] {ticker} {exchange} {e}")
+        return False
+    
+        
+        
+    
 
 if __name__ == "__main__":
     import json
@@ -545,18 +615,18 @@ if __name__ == "__main__":
     get_kis_token(True)
 
     
-    _5m_price = get_current_price('TSLA','NAS', True)
-    print(_5m_price)
+    _5m_price = get_5m_candles('TSLA','NASD', True)
+    print(_5m_price[:20])
 
     # yf_5m = yf.download("BIYA",progress=False,prepost=True,multi_level_index=False)
     # print(yf_5m.head(5))
 
     # total, orderable = get_account_balance(True)
-    hold = get_stock_quantity(True)
-    unfilled = get_unfilled_quantity(True)
+    # hold = get_stock_quantity(True)
+    # unfilled = get_unfilled_quantity(True)
 
-    print(hold)
-    print(unfilled)
+    # print(hold)
+    # print(unfilled)
 
     # print(total)
     # print(orderable)

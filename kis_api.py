@@ -129,7 +129,7 @@ def get_account_balance(real:bool=False):
         output3 = data['output3']
         
         if real:
-            stock_val = float(output3.get('pchs_amt_smtl', 0))
+            stock_val = float(output3.get('pchs_amt_smtl_amt', 0))
             cash_val = float(output3.get('frcr_use_psbl_amt', 0))
         else:
             stock_val = float(output3.get('pchs_amt_smtl', 0))
@@ -618,21 +618,21 @@ if __name__ == "__main__":
     get_kis_token(True)
 
     
-    _5m_price = get_5m_candles('TSLA','NASD', True)
-    print(_5m_price[:20])
+    # _5m_price = get_5m_candles('TSLA','NASD', True)
+    # print(_5m_price[:20])
 
     # yf_5m = yf.download("BIYA",progress=False,prepost=True,multi_level_index=False)
     # print(yf_5m.head(5))
 
-    # total, orderable = get_account_balance(True)
+    total, orderable = get_account_balance(True)
     # hold = get_stock_quantity(True)
     # unfilled = get_unfilled_quantity(True)
 
     # print(hold)
     # print(unfilled)
 
-    # print(total)
-    # print(orderable)
+    print(total)
+    print(orderable)
     # print(json.dumps(hold, indent=2))
 
     # send_sell_order('BIYA','4','5251','NASD')

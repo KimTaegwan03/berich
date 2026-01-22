@@ -51,6 +51,8 @@ def ichimoku(df: pd.DataFrame, conf):
     final_high = clean_list(df['High'].tolist()) + pad_none
     final_low = clean_list(df['Low'].tolist()) + pad_none
     final_close = clean_list(df['Close'].tolist()) + pad_none
+    final_volume = clean_list(df['Volume'].tolist()) + pad_none
+
 
     span_a_list = span_a_calc.tolist()
     span_b_list = span_b_calc.tolist()
@@ -63,6 +65,7 @@ def ichimoku(df: pd.DataFrame, conf):
                 "high": final_high,
                 "low": final_low,
                 "close": final_close,
+                "volume": final_volume,
                 "span_a": final_span_a,
                 "span_b": final_span_b
             }
@@ -88,6 +91,7 @@ def span_b_signal(data, n, k):
     # print(data['span_b'][-n:])
     
     # 마지막 span_b 값 기준 이전 n개의 span_b 값이 오차범위 k% 내에 있으면 일단 통과
+    span_a_values = data['span_a']
     span_b_values = data['span_b']
     close_values = data['close']
 
@@ -102,11 +106,12 @@ def span_b_signal(data, n, k):
 
     # 마지막 n개의 span_b 값 추출 (None 값 제외)
     recent_span_b_raw = [val for val in span_b_values[-n:] if val is not None]
+    recent_span_a_raw = [val for val in span_a_values[-n:] if val is not None]
+
 
     # [디버깅용] recent_span_b_raw 출력
-    # print(recent_span_b_raw)
     
-    if not recent_span_b_raw:
+    if not recent_span_b_raw or not recent_span_a_raw:
         return False, None # "최근 Span B 데이터 부족"
 
     # 마지막 유효한 span_b 값
@@ -114,8 +119,8 @@ def span_b_signal(data, n, k):
 
     # 오차 범위 내에 있는지 확인
     is_flat = True
-    for val in recent_span_b_raw:
-        if not (current_span_b_val * (1 - k/100) <= val <= current_span_b_val * (1 + k/100)):
+    for val_a, val in zip(recent_span_a_raw, recent_span_b_raw):
+        if not (current_span_b_val * (1 - k/100) <= val <= current_span_b_val * (1 + k/100)) or val_a <= val:
             is_flat = False
             break
     
@@ -156,13 +161,9 @@ if __name__ == "__main__":
     excg = "NASD"
 
     prices = get_5m_candles(ticker, excg, real=True)
-    yf_prices = yf.download(ticker, interval="5m", period="5d", prepost=True, progress=False, multi_level_index=False)
-
-    print(yf_prices)
-    print(prices)
 
     chart_data = ichimoku(prices, {"delta": timedelta(minutes=5)})
 
-    ichimoku_signal = span_b_signal(chart_data,5,2)
+    ichimoku_signal = span_b_signal(chart_data,7,2)
     print(ticker)
     print(ichimoku_signal)

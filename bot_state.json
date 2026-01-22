@@ -1,33 +1,38 @@
 {
-  "updated_at": "2026-01-22T00:57:13",
+  "updated_at": "2026-01-23T01:55:00",
   "acc_stock": {
-    "AMOD": {
-      "avg_pric": 0.87,
-      "qty": 21,
-      "excg": "NASD",
-      "stage": 0,
-      "max_profit": -0.7701149425287401
-    },
-    "BNAI": {
-      "avg_pric": 8.645,
+    "CMCT": {
+      "avg_pric": 4.38,
       "qty": 4,
       "excg": "NASD",
       "stage": 0,
-      "max_profit": 0.6362058993637908
+      "max_profit": 6.849315068493146
     },
-    "RDHL": {
-      "avg_pric": 1.43,
-      "qty": 10,
+    "SXTP": {
+      "avg_pric": 5.5,
+      "qty": 4,
       "excg": "NASD",
       "stage": 0,
-      "max_profit": -8.391608391608383
+      "max_profit": 12.363636363636358
+    },
+    "IOBT": {
+      "avg_pric": 0.2768,
+      "qty": 85,
+      "excg": "NASD",
+      "stage": 0,
+      "max_profit": 19.21965317919076
     }
   },
   "pending_orders": {
-    "PAVM": {
-      "order_price": 6.32,
-      "qty": 1,
-      "order_no": "0030745090"
+    "SHPH": {
+      "order_price": 2.2,
+      "qty": 10,
+      "order_no": ""
+    },
+    "CAPT": {
+      "order_price": 0.54,
+      "qty": 44,
+      "order_no": ""
     }
   }
 }

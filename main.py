@@ -25,7 +25,7 @@ STATE_LOCK = asyncio.Lock()
 # [설정] 봇 파라미터
 # ==========================================================
 CRAWL_INTERVAL_SEC = 120  # [정찰병] 크롤링 주기 (3분) -> 밴 방지!
-TRADE_INTERVAL_SEC = 20   # [스나이퍼] 매매 주기 (15초) -> 급등주 대응!
+TRADE_INTERVAL_SEC = 5   # [스나이퍼] 매매 주기 (15초) -> 급등주 대응!
 
 MAX_SLOTS = 5
 BUY_PERCENT = 19
@@ -36,8 +36,8 @@ GLOBAL_TARGET_TICKERS = []
 REMAINING_RATIO = {0: 1.0, 1: 0.70, 2: 0.50, 3: 0.30, 4: 0.15, 5: 0.0}
 PROFIT_STEPS = [
     # (target_stage, trigger_profit_pct, sell_ratio_on_init_qty)
-    (1, 15.0, 0.30),
-    (2, 50.0, 0.20),
+    (1, 30.0, 0.30),
+    (2, 60.0, 0.20),
     (3, 100.0, 0.20),
     (4, 150.0, 0.15),
     (5, 200.0, 0.15),
@@ -57,7 +57,7 @@ MIN_REMAIN_SHARES = 1           # stage 1~4에서는 최소 1주 남기기(전�
 
 LOSS_RATIO = 10  # %
 
-SIGNAL_N = 5 # Flat 유지 기간
+SIGNAL_N = 7 # Flat 유지 기간
 SIGNAL_K = 2 # 오차 범위 (%)
 ORDER_LIFETIME_LIMIT = 2 * 60 * 60 # 2시간
 
@@ -156,7 +156,7 @@ async def sync_account_data_safe(real:bool=False):
             NEW_PENDING[ticker] = {
                 "order_price": float(order['ft_ord_unpr3']),
                 "qty": int(order['nccs_qty']),
-                "order_no": order['odno']
+                "order_no": order['orgn_odno']
             }
 
     # ---- 보유 동기화(stage/max_profit 보존) ----
@@ -277,14 +277,13 @@ async def trading_bot_loop(real:bool=False):
         # print(f"[현재시각_디버깅용] {now}")
         # print(f"[시작시각_디버깅용] {datetime.strptime('18:00:00', '%H:%M:%S').time()}")
         if not (
-            (now >= datetime.strptime("18:00:00", "%H:%M:%S").time() and now <= datetime.strptime("21:59:59", "%H:%M:%S").time()) or
-            (now >= datetime.strptime("23:00:00", "%H:%M:%S").time() and now <= datetime.strptime("23:59:59", "%H:%M:%S").time()) or
+            (now >= datetime.strptime("18:00:00", "%H:%M:%S").time() and now <= datetime.strptime("23:59:59", "%H:%M:%S").time()) or
             (now >= datetime.strptime("00:00:00", "%H:%M:%S").time() and now <= datetime.strptime("05:00:00", "%H:%M:%S").time())
             ):
             print("😴 [Bot] 미국 주식 시장 운영 시간 외에는 대기합니다.")
 
             # 만약 주식을 가지고 있거나, 미체결 내역이 있으면 팔기 및 취소하기            
-            if ACC_STOCK or PENDING_ORDERS:
+            if (ACC_STOCK or PENDING_ORDERS) and (now >= datetime.strptime("05:00:01", "%H:%M:%S").time() and now <= datetime.strptime("06:00:00", "%H:%M:%S").time()) :
                 print("⚠️ [Bot] 시장 운영 시간 외, 보유 종목 및 미체결 주문 정리 시도...")
                 
                 # 보유 종목 매도
@@ -383,15 +382,19 @@ async def trading_bot_loop(real:bool=False):
                         # 1. 내 계좌 총 자산 조회 (주식평가금 + 현금)
                         total_asset, orderable_cash = get_account_balance(real)
 
-                        total_asset = total_asset / 1500 # 환율 적용
+                        # total_asset = total_asset / 1500 # 환율 적용
                         orderable_cash = orderable_cash / 1500 # 환율 적용
-                        
-                        if total_asset <= 0:
+
+                        async with STATE_LOCK:
+                            used_slots = len(ACC_STOCK) + len(PENDING_ORDERS)
+
+                        if orderable_cash <= 0:
                             print(f"⚠️ [Skip] 자산 조회 오류 또는 잔고 0 (Asset: {total_asset})")
                             continue
 
-                        # 2. 목표 매수 금액 계산 (총자산의 5%)
-                        target_amount = total_asset * (BUY_PERCENT / 100)
+                        remain_slot = MAX_SLOTS - used_slots
+
+                        target_amount = (orderable_cash / remain_slot) * 0.98
                         
                         # 3. 매수 가능 수량 계산 (목표금액 / 주당가격) -> 소수점 버림
                         qty = math.floor(target_amount / order_price)
